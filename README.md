@@ -1,67 +1,92 @@
-# Connecting PostgreSQL with Java using JDBC
+## gRPC Homework using ProfoBuff
 
-## Overview
-This guide walks you through the process of establishing a connection between Java and PostgreSQL using JDBC.
+#### Platform & Software Versions:
+  - Windows
+  - protoc 25.2
+  - Intellij Idea Ultimate 2024.3.3
 
-## Prerequisites
-- *IDE:* IntelliJ IDEA Ultimate  
-- *JDBC Driver:* Version 42.7.5  
-- *JVM:* OpenJDK 23.0.1  
-- *PostgreSQL:* Version 17.2  
+#### Step 1: Create .proto file and add code.
 
----
+##### Code:
+```proto
+syntax="proto3";
+package td0;
+option java_multiple_files = true;
+message MyUser {
+    string email=1;
+    uint32 year_of_birth=2;
+}
+```
 
-## Steps to Set Up JDBC Connection
+#### Step 2: Compile code using protoc command
+```
+protoc -I . --java_out . Ex0.proto
+```
+##### This will generate the package folder with the java classes (MyUser, MyUserOrBuilder, Ex0)
 
-### 1. Install the PostgreSQL JDBC Driver
-Download the latest PostgreSQL JDBC driver from the official site:  
-[🔗 JDBC Driver Download](https://jdbc.postgresql.org/download/)
+![Alt text](output/STEP2.png)
 
-### 2. Add JDBC Driver to IntelliJ IDEA
-1. Open *IntelliJ IDEA Ultimate*.
-2. Go to *File* → *Project Structure* → *Libraries*.
-3. Click *Add New Library* and locate the downloaded JDBC driver.
-4. Save and apply the changes.
+#### Step 3: Adding the Server Code
+```java
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import td0.MyUser;
 
-### 3. Create a Table in PostgreSQL
-Ensure your database is set up, and create a table as needed. Example:
-
-sql
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL
-);
-
-
-### 4. Establish Connection in Java
-Use the DriverManager class to connect to PostgreSQL:
-
-java
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-
-public class PostgreSQLConnection {
+public class Server {
     public static void main(String[] args) {
-        String url = "jdbc:postgresql://your_host:your_port/your_database";
-        String user = "your_username";
-        String password = "your_password";
-
-        try (Connection conn = DriverManager.getConnection(url, user, password)) {
-            if (conn != null) {
-                System.out.println("Connected to PostgreSQL successfully!");
+        try (ServerSocket serverSocket = new ServerSocket(12345)) {
+            System.out.println("Server is listening on port 12345");
+            while (true) {
+                try (Socket socket = serverSocket.accept()) {
+                    MyUser user = MyUser.newBuilder()
+                            .setEmail("carl.charro@outlook.com")
+                            .setYearOfBirth(2003)
+                            .build();
+                    OutputStream outputStream = socket.getOutputStream();
+                    user.writeTo(outputStream);
+                    outputStream.flush();
+                    user.writeTo(new FileOutputStream("td1.ser"));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        } catch (SQLException e) {
-            System.out.println("Connection failed: " + e.getMessage());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+#### Step 4: Adding the Client code
+```java
+import com.google.protobuf.InvalidProtocolBufferException;
+import td0.MyUser;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.Socket;
+public class Client {
+    public static void main(String[] args) {
+        try (Socket socket = new Socket("localhost", 12345)) {
+            InputStream inputStream = socket.getInputStream();
+            MyUser user = MyUser.parseFrom(inputStream);
+            System.out.println("Email: " + user.getEmail());
+            System.out.println("Year of Birth: " + user.getYearOfBirth());
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
 
+```
 
-Replace your_host, your_port, your_database, your_username, and your_password with your actual database credentials.
+#### Step 5: Run Server then Client
 
-### 5. Run the Java Program
-1. Compile the program in IntelliJ IDEA.
-2. Run the main method to test the database connection.
-3. If successful, you should see: *"Connected to PostgreSQL successfully!"*
+![Alt text](output/SERVER.png)
+![Alt text](output/CLIENT.png)
+
+#### Step 6: Examining the .ser file using hexdump
+
+![Alt text](output/STEP6.png)
